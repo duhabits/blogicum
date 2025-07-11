@@ -85,3 +85,17 @@ class Post(IsPublishedCreatedAtAbsract):
 
     def __str__(self) -> str:
         return self.title[:MAX_DISPLAY_LENGTH]
+
+
+class Comment(models.Model):
+    text = models.TextField('Текст комментария')
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='congratulations',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('created_at',)
