@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models.manager import Manager
-from django.views.generic import ListView, CreateView
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
 
@@ -30,10 +30,13 @@ def filter_published_posts(queryset: Manager):
 
 def post_detail(request, post_id):
     post = get_object_or_404(filter_published_posts(Post.objects), pk=post_id)
+    comments = Comment.objects.filter(post_id=post_id)
+    print(comments)
+    print(post_id)
     return render(
         request,
         'blog/detail.html',
-        {'post': post, 'form': CongratulationForm()},
+        {'post': post, 'form': CongratulationForm(), 'comments': comments},
     )
 
 
@@ -88,6 +91,40 @@ class CommentCreateView(CreateView, LoginRequiredMixin):
         form.instance.author = self.request.user
         form.instance.post = post
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse(
+            'blog:post_detail', kwargs={'post_id': self.kwargs['post_id']}
+        )
+
+
+class CommentEditUpdateView(LoginRequiredMixin, UpdateView):
+    model = Comment
+    fields = (('text'),)
+    template_name = 'blog/comment.html'
+    pk_url_kwarg = 'comment_id'
+
+    def test_func(self):
+        """Проверяет, что пользователь - автор комментария"""
+        comment = Comment.objects.filter(id=self.kwargs['comment_id'])
+        return self.request.user == comment.author
+
+    def get_success_url(self):
+        return reverse(
+            'blog:post_detail', kwargs={'post_id': self.kwargs['post_id']}
+        )
+
+
+class CommentDeliteUpdateView(LoginRequiredMixin, DeleteView):
+    model = Comment
+    fields = (('text'),)
+    template_name = 'blog/comment.html'
+    pk_url_kwarg = 'comment_id'
+
+    def test_func(self):
+        """Проверяет, что пользователь - автор комментария"""
+        comment = Comment.objects.filter(id=self.kwargs['comment_id'])
+        return self.request.user == comment.author
 
     def get_success_url(self):
         return reverse(
