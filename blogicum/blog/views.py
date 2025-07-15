@@ -32,14 +32,25 @@ def filter_published_posts(queryset: Manager):
 
 
 def post_detail(request, post_id):
-    post = get_object_or_404(filter_published_posts(Post.objects), pk=post_id)
+    post_obj = get_object_or_404(Post, pk=post_id)
     comments = Comment.objects.filter(post_id=post_id)
-    print(comments)
-    print(post_id)
+    if post_obj.author == request.user:
+        return render(
+            request,
+            'blog/detail.html',
+            {
+                'post': post_obj,
+                'form': CongratulationForm(),
+                'comments': comments,
+            },
+        )
+    post_obj = get_object_or_404(
+        filter_published_posts(Post.objects), pk=post_id
+    )
     return render(
         request,
         'blog/detail.html',
-        {'post': post, 'form': CongratulationForm(), 'comments': comments},
+        {'post': post_obj, 'form': CongratulationForm(), 'comments': comments},
     )
 
 
@@ -189,17 +200,13 @@ class PostEditUpdateView(LoginRequiredMixin, UpdateView):
     form_class = PostForm
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
-    login_url = '/auth/login/'  # Укажите ваш URL для входа
 
     def dispatch(self, request, *args, **kwargs):
-        # Для неавторизованных пользователей - редирект на страницу поста
-        if not request.user.is_authenticated:
+        self.post_obj = get_object_or_404(Post, id=kwargs['post_id'])
+        print(self.post_obj)
+        print(request.user.username)
+        if request.user != self.post_obj.author:
             return redirect('blog:post_detail', post_id=kwargs['post_id'])
-
-        # Проверка авторства для авторизованных пользователей
-        self.post = get_object_or_404(Post, id=kwargs['post_id'])
-        if request.user != self.post.author:
-            raise PermissionDenied("Вы не можете редактировать чужой пост")
 
         return super().dispatch(request, *args, **kwargs)
 
@@ -214,10 +221,14 @@ class PostDeleteDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
 
-    def test_func(self):
-        """Проверяет, что пользователь - автор поста"""
-        post = get_object_or_404(Post, id=self.kwargs['post_id'])
-        return self.request.user == post.author
+    def dispatch(self, request, *args, **kwargs):
+        self.post_obj = get_object_or_404(Post, id=kwargs['post_id'])
+        print(self.post_obj)
+        print(request.user.username)
+        if request.user != self.post_obj.author:
+            return redirect('blog:post_detail', post_id=kwargs['post_id'])
+
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse('blog:index')  # Изменено на редирект на главную страницу
