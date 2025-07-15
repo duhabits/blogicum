@@ -1,6 +1,8 @@
 from typing import Any
 from django.db.models.query import QuerySet
-from django.shortcuts import render
+from django.forms import BaseModelForm
+from django.http import HttpResponse
+from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
@@ -8,10 +10,11 @@ from django.db.models.manager import Manager
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
+from django.core.exceptions import PermissionDenied
 
 from .models import Post, Category, Comment
 from .const import MAX_POSTS_LIMIT
-from .forms import CongratulationForm
+from .forms import PostForm, CongratulationForm, UserEditForm
 
 User = get_user_model()
 
@@ -40,13 +43,16 @@ def post_detail(request, post_id):
     )
 
 
-class IndexListView(ListView, LoginRequiredMixin):
+class IndexListView(ListView):
     model = Post
     template_name = 'blog/index.html'
     paginate_by = 10
 
+    def get_queryset(self) -> QuerySet[Any]:
+        return filter_published_posts(Post.objects.all())
 
-class СategoryListView(ListView, LoginRequiredMixin):
+
+class CategoryListView(LoginRequiredMixin, ListView):
     model = Post
     template_name = 'blog/category.html'
     paginate_by = 10
@@ -63,30 +69,54 @@ class СategoryListView(ListView, LoginRequiredMixin):
         return context
 
 
-class UserProfileView(ListView, LoginRequiredMixin):
+class UserProfileListView(ListView):
     model = Post
     template_name = 'blog/profile.html'
     context_object_name = 'page_obj'
     paginate_by = 10
 
     def get_queryset(self) -> QuerySet[Any]:
-        user = get_object_or_404(User, username=self.kwargs['username'])
-        return user.posts.all()
+        self.profile_user = get_object_or_404(
+            User, username=self.kwargs['username']
+        )
+        queryset = self.profile_user.posts.all()
+
+        # Для не-владельцев показываем только опубликованные посты
+        if self.request.user != self.profile_user:
+            queryset = filter_published_posts(queryset)
+
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['profile'] = get_object_or_404(
-            User, username=self.kwargs['username']
-        )
+        context['profile'] = self.profile_user
         return context
 
 
-class CommentCreateView(CreateView, LoginRequiredMixin):
+class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
+    model = User
+    form_class = UserEditForm
+    template_name = 'blog/user.html'
+
+    def get_object(self):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse(
+            'blog:profile', kwargs={'username': self.request.user.username}
+        )
+
+
+class CommentCreateView(CreateView):
     model = Comment
     fields = (('text'),)
     template_name = 'blog/comment_form.html'
 
     def form_valid(self, form):
+        if not self.request.user.is_authenticated:
+            raise PermissionDenied(
+                "Вы должны войти, чтобы оставить комментарий."
+            )
         post = get_object_or_404(Post, pk=self.kwargs['post_id'])
         form.instance.author = self.request.user
         form.instance.post = post
@@ -100,14 +130,21 @@ class CommentCreateView(CreateView, LoginRequiredMixin):
 
 class CommentEditUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
-    fields = (('text'),)
+    fields = ('text',)
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
-    def test_func(self):
-        """Проверяет, что пользователь - автор комментария"""
-        comment = Comment.objects.filter(id=self.kwargs['comment_id'])
-        return self.request.user == comment.author
+    def dispatch(self, request, *args, **kwargs):
+        # Получаем комментарий до основной обработки
+        self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
+
+        # Проверяем авторство
+        if not request.user == self.comment.author:
+            raise PermissionDenied(
+                "Вы не можете редактировать чужой комментарий"
+            )
+
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse(
@@ -115,18 +152,72 @@ class CommentEditUpdateView(LoginRequiredMixin, UpdateView):
         )
 
 
-class CommentDeliteUpdateView(LoginRequiredMixin, DeleteView):
+class CommentDeleteDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
-    fields = (('text'),)
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
-    def test_func(self):
-        """Проверяет, что пользователь - автор комментария"""
-        comment = Comment.objects.filter(id=self.kwargs['comment_id'])
-        return self.request.user == comment.author
+    def dispatch(self, request, *args, **kwargs):
+        self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
+        if not request.user == self.comment.author:
+            raise PermissionDenied("Вы не можете удалить чужой комментарий")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse(
             'blog:post_detail', kwargs={'post_id': self.kwargs['post_id']}
         )
+
+
+class PostCreateView(LoginRequiredMixin, CreateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/create.html'
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse(
+            'blog:profile', kwargs={'username': self.request.user.username}
+        )
+
+
+class PostEditUpdateView(LoginRequiredMixin, UpdateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/create.html'
+    pk_url_kwarg = 'post_id'
+    login_url = '/auth/login/'  # Укажите ваш URL для входа
+
+    def dispatch(self, request, *args, **kwargs):
+        # Для неавторизованных пользователей - редирект на страницу поста
+        if not request.user.is_authenticated:
+            return redirect('blog:post_detail', post_id=kwargs['post_id'])
+
+        # Проверка авторства для авторизованных пользователей
+        self.post = get_object_or_404(Post, id=kwargs['post_id'])
+        if request.user != self.post.author:
+            raise PermissionDenied("Вы не можете редактировать чужой пост")
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse(
+            'blog:profile', kwargs={'username': self.request.user.username}
+        )
+
+
+class PostDeleteDeleteView(LoginRequiredMixin, DeleteView):
+    model = Post
+    template_name = 'blog/create.html'
+    pk_url_kwarg = 'post_id'
+
+    def test_func(self):
+        """Проверяет, что пользователь - автор поста"""
+        post = get_object_or_404(Post, id=self.kwargs['post_id'])
+        return self.request.user == post.author
+
+    def get_success_url(self):
+        return reverse('blog:index')  # Изменено на редирект на главную страницу

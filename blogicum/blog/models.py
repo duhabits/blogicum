@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.utils.functional import cached_property
 
 from core.models import IsPublishedCreatedAtAbsract
 from .const import MAX_CHARFIELD_LENGTH, MAX_DISPLAY_LENGTH
@@ -55,6 +57,7 @@ class Post(IsPublishedCreatedAtAbsract):
         verbose_name='Дата и время публикации',
         help_text='Если установить дату и время в будущем — '
         'можно делать отложенные публикации.',
+        default=timezone.now,
     )
     author = models.ForeignKey(
         User,
@@ -77,6 +80,11 @@ class Post(IsPublishedCreatedAtAbsract):
         on_delete=models.SET_NULL,
         verbose_name='Категория',
     )
+    image = models.ImageField('Фото', upload_to='post_images', blank=True)
+
+    @property
+    def comment_count(self):
+        return self.comments.count()
 
     class Meta:
         verbose_name = 'публикация'
@@ -92,7 +100,7 @@ class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='congratulations',
+        related_name='comments',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
