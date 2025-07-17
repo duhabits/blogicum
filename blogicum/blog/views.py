@@ -1,7 +1,5 @@
 from typing import Any
 from django.db.models.query import QuerySet
-from django.forms import BaseModelForm
-from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -145,7 +143,6 @@ class CommentEditUpdateView(LoginRequiredMixin, UpdateView):
     pk_url_kwarg = 'comment_id'
 
     def dispatch(self, request, *args, **kwargs):
-        # Получаем комментарий до основной обработки
         self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
 
         # Проверяем авторство
@@ -230,4 +227,4 @@ class PostDeleteDeleteView(LoginRequiredMixin, DeleteView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
-        return reverse('blog:index')  # Изменено на редирект на главную страницу
+        return reverse('blog:index')

@@ -4,7 +4,6 @@ from django.conf import settings
 from django.views.generic.edit import CreateView
 from django.contrib.auth.forms import UserCreationForm
 from django.conf.urls.static import static
-from django.contrib.auth.views import LogoutView
 
 handler500 = 'core.views.server_error'
 

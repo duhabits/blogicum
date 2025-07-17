@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.utils.functional import cached_property
 
 from core.models import IsPublishedCreatedAtAbsract
 from .const import MAX_CHARFIELD_LENGTH, MAX_DISPLAY_LENGTH
