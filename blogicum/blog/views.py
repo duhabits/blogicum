@@ -13,7 +13,6 @@ from django.urls import reverse
 from django.core.exceptions import PermissionDenied
 
 from .models import Post, Category, Comment
-from .const import MAX_POSTS_LIMIT
 from .forms import PostForm, CongratulationForm, UserEditForm
 
 User = get_user_model()
