@@ -11,7 +11,8 @@ from django.urls import reverse
 from django.core.exceptions import PermissionDenied
 
 from .models import Post, Category, Comment
-from .forms import PostForm, CongratulationForm, UserEditForm
+from .forms import PostForm, CommentForm, UserEditForm
+from .const import PAGINATE_BY
 
 User = get_user_model()
 
@@ -30,14 +31,14 @@ def filter_published_posts(queryset: Manager):
 
 def post_detail(request, post_id):
     post_obj = get_object_or_404(Post, pk=post_id)
-    comments = Comment.objects.filter(post_id=post_id)
+    comments = post_obj.comments.all()
     if post_obj.author == request.user:
         return render(
             request,
             'blog/detail.html',
             {
                 'post': post_obj,
-                'form': CongratulationForm(),
+                'form': CommentForm(),
                 'comments': comments,
             },
         )
@@ -47,7 +48,7 @@ def post_detail(request, post_id):
     return render(
         request,
         'blog/detail.html',
-        {'post': post_obj, 'form': CongratulationForm(), 'comments': comments},
+        {'post': post_obj, 'form': CommentForm(), 'comments': comments},
     )
 
 
@@ -63,17 +64,21 @@ class IndexListView(ListView):
 class CategoryListView(LoginRequiredMixin, ListView):
     model = Post
     template_name = 'blog/category.html'
-    paginate_by = 10
+    paginate_by = PAGINATE_BY
 
-    def get_queryset(self) -> QuerySet[Any]:
-        self.category = get_object_or_404(
+    def get_category(self):
+        category = get_object_or_404(
             Category, is_published=True, slug=self.kwargs['category_slug']
         )
+        return category
+
+    def get_queryset(self) -> QuerySet[Any]:
+        self.category = self.get_category()
         return filter_published_posts(self.category.posts)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        context['category'] = self.category
+        context['category'] = self.get_category()
         return context
 
 
@@ -81,7 +86,7 @@ class UserProfileListView(ListView):
     model = Post
     template_name = 'blog/profile.html'
     context_object_name = 'page_obj'
-    paginate_by = 10
+    paginate_by = PAGINATE_BY
 
     def get_queryset(self) -> QuerySet[Any]:
         self.profile_user = get_object_or_404(

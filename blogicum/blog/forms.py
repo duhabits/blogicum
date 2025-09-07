@@ -29,8 +29,15 @@ class PostForm(forms.ModelForm):
             raise ValidationError("Дата публикации не может быть в прошлом")
         return pub_date
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            now = timezone.now()
+            formatted_date = now.strftime('%Y-%m-%dT%H:%M')
+            self.initial['pub_date'] = formatted_date
 
-class CongratulationForm(forms.ModelForm):
+
+class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = ('text',)

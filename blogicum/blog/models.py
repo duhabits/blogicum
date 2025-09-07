@@ -2,13 +2,13 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from core.models import IsPublishedCreatedAtAbsract
+from core.models import IsPublishedAbsract, CreatedAt
 from .const import MAX_CHARFIELD_LENGTH, MAX_DISPLAY_LENGTH
 
 User = get_user_model()
 
 
-class Category(IsPublishedCreatedAtAbsract):
+class Category(IsPublishedAbsract, CreatedAt):
     title = models.CharField(
         help_text='Максимальная длина строки — 256 символов',
         max_length=MAX_CHARFIELD_LENGTH,
@@ -30,7 +30,7 @@ class Category(IsPublishedCreatedAtAbsract):
         return self.title[:MAX_DISPLAY_LENGTH]
 
 
-class Location(IsPublishedCreatedAtAbsract):
+class Location(IsPublishedAbsract, CreatedAt):
     name = models.CharField(
         help_text='Максимальная длина строки — 256 символов',
         max_length=MAX_CHARFIELD_LENGTH,
@@ -45,7 +45,7 @@ class Location(IsPublishedCreatedAtAbsract):
         return self.name[:MAX_DISPLAY_LENGTH]
 
 
-class Post(IsPublishedCreatedAtAbsract):
+class Post(IsPublishedAbsract, CreatedAt):
     title = models.CharField(
         help_text='Максимальная длина строки — 256 символов',
         max_length=MAX_CHARFIELD_LENGTH,
@@ -94,15 +94,24 @@ class Post(IsPublishedCreatedAtAbsract):
         return self.title[:MAX_DISPLAY_LENGTH]
 
 
-class Comment(models.Model):
+class Comment(CreatedAt):
     text = models.TextField('Текст комментария')
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
         related_name='comments',
+        verbose_name='Пост',
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='authored_comments',
+        verbose_name='Автор',
+    )
 
     class Meta:
-        ordering = ('created_at',)
+        verbose_name = 'Коментарий'
+        verbose_name_plural = 'Коментарии'
+
+    def __str__(self) -> str:
+        return self.text

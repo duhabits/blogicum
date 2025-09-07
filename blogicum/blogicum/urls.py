@@ -5,9 +5,9 @@ from django.views.generic.edit import CreateView
 from django.contrib.auth.forms import UserCreationForm
 from django.conf.urls.static import static
 
-handler500 = 'core.views.server_error'
+handler500 = 'pages.views.server_error'
 
-handler404 = 'core.views.page_not_found'
+handler404 = 'pages.views.page_not_found'
 
 urlpatterns = [
     path('auth/', include('django.contrib.auth.urls')),
