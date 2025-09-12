@@ -81,10 +81,6 @@ class Post(IsPublishedAbsract, CreatedAt):
     )
     image = models.ImageField('Фото', upload_to='post_images', blank=True)
 
-    @property
-    def comment_count(self):
-        return self.comments.count()
-
     class Meta:
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
