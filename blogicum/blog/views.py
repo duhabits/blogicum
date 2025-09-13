@@ -21,32 +21,13 @@ from django.core.exceptions import PermissionDenied
 from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm, UserEditForm
 from .const import PAGINATE_BY
-from core.utils import is_post_visible
+from core.utils import is_post_visible, filter_published_posts
 from core.mixins import CommentMixinView, PostMixinView
 
 User = get_user_model()
 
 
-def filter_published_posts(queryset: Manager):
-    return queryset.select_related(
-        'category',
-        'location',
-        'author',
-    ).filter(
-        pub_date__lte=timezone.now(),
-        is_published=True,
-        category__is_published=True,
-    )
-
-
 class PostDetailView(DetailView):
-    """Страница просмотра одного поста.
-
-    Доступ только автору или если пост опубликован и категория опубликована.
-    Отображает форму комментария (если пользователь авторизован) и список
-    комментариев.
-    """
-
     model = Post
     template_name = "blog/detail.html"
     pk_url_kwarg = "post_id"
@@ -200,8 +181,8 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
 
 class PostEditUpdateView(PostMixinView, UpdateView):
-    pk_url_kwarg = 'post_id'
+    form_class = PostForm
 
 
-class PostDeleteDeleteView(DeleteView, PostMixinView):
+class PostDeleteDeleteView(PostMixinView, DeleteView):
     pass
