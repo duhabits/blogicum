@@ -94,13 +94,15 @@ class UserProfileListView(ListView):
         self.profile_user = get_object_or_404(
             User, username=self.kwargs['username']
         )
-        queryset = self.profile_user.posts.all()
+        queryset = self.profile_user.posts.select_related("category").annotate(
+            comment_count=Count("comments")
+        )
 
         # Для не-владельцев показываем только опубликованные посты
         if self.request.user != self.profile_user:
             queryset = filter_published_posts(queryset)
 
-        return queryset
+        return queryset.order_by('-pub_date')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

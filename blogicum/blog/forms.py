@@ -1,10 +1,9 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from .models import Post
 from django.contrib.auth import get_user_model
 
-from .models import Comment
+from .models import Comment, Post
 
 User = get_user_model()
 
@@ -12,29 +11,29 @@ User = get_user_model()
 class UserEditForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'username']
+        fields = ('first_name', 'last_name', 'email', 'username')
 
 
 class PostForm(forms.ModelForm):
     class Meta:
         model = Post
-        fields = ['title', 'text', 'pub_date', 'location', 'category', 'image']
+        exclude = ('author',)
         widgets = {
-            'pub_date': forms.DateInput(attrs={'type': 'date'}),
+            'pub_date': forms.DateTimeInput(
+                attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'
+            ),
         }
 
     def clean_pub_date(self):
         pub_date = self.cleaned_data['pub_date']
         if pub_date and pub_date.date() < timezone.now().date():
-            raise ValidationError("Дата публикации не может быть в прошлом")
+            raise ValidationError('Дата публикации не может быть в прошлом')
         return pub_date
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.instance.pk:
-            now = timezone.now()
-            formatted_date = now.strftime('%Y-%m-%dT%H:%M')
-            self.initial['pub_date'] = formatted_date
+            self.initial['pub_date'] = timezone.now()
 
 
 class CommentForm(forms.ModelForm):
