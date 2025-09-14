@@ -1,12 +1,10 @@
 from typing import Any
 from django.db.models.query import QuerySet
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404
 from django.http import Http404
 from django.utils import timezone
 from django.db.models import Count
-from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-from django.db.models.manager import Manager
 from django.views.generic import (
     ListView,
     CreateView,
@@ -22,7 +20,7 @@ from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm, UserEditForm
 from .const import PAGINATE_BY
 from core.utils import is_post_visible, filter_published_posts
-from core.mixins import CommentMixinView, PostMixinView
+from core.mixins import CommentMixinView, CommentAccessMixin, PostMixinView
 
 User = get_user_model()
 
@@ -124,7 +122,7 @@ class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
         )
 
 
-class CommentCreateView(CommentMixinView):
+class CommentCreateView(CommentMixinView, CreateView):
     fields = (('text'),)
     template_name = 'blog/comment_form.html'
 
@@ -139,32 +137,25 @@ class CommentCreateView(CommentMixinView):
         return super().form_valid(form)
 
 
-class CommentEditUpdateView(LoginRequiredMixin, CommentMixinView):
+class CommentEditUpdateView(CommentAccessMixin, CommentMixinView, UpdateView):
+    model = Comment
     fields = ('text',)
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
-    def dispatch(self, request, *args, **kwargs):
-        self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
 
-        # Проверяем авторство
-        if not request.user == self.comment.author:
-            raise PermissionDenied(
-                "Вы не можете редактировать чужой комментарий"
-            )
-
-        return super().dispatch(request, *args, **kwargs)
-
-
-class CommentDeleteDeleteView(LoginRequiredMixin, CommentMixinView):
+class CommentDeleteDeleteView(CommentAccessMixin, CommentMixinView, DeleteView):
+    model = Comment
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
-    def dispatch(self, request, *args, **kwargs):
-        self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
-        if not request.user == self.comment.author:
-            raise PermissionDenied("Вы не можете удалить чужой комментарий")
-        return super().dispatch(request, *args, **kwargs)
+    def get(self, request, *args, **kwargs):
+        """GET-запрос только показывает форму подтверждения, не удаляет"""
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        """POST-запрос выполняет удаление"""
+        return super().post(request, *args, **kwargs)
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
