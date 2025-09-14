@@ -2,7 +2,6 @@ from typing import Any
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
 from django.http import Http404
-from django.utils import timezone
 from django.db.models import Count
 from django.contrib.auth import get_user_model
 from django.views.generic import (
@@ -20,7 +19,7 @@ from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm, UserEditForm
 from .const import PAGINATE_BY
 from core.utils import is_post_visible, filter_published_posts
-from core.mixins import CommentMixinView, CommentAccessMixin, PostMixinView
+from core.mixins import CommentMixinView, CommentAccesMixin, PostMixinView
 
 User = get_user_model()
 
@@ -137,14 +136,14 @@ class CommentCreateView(CommentMixinView, CreateView):
         return super().form_valid(form)
 
 
-class CommentEditUpdateView(CommentAccessMixin, CommentMixinView, UpdateView):
+class CommentEditUpdateView(CommentAccesMixin, CommentMixinView, UpdateView):
     model = Comment
     fields = ('text',)
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
 
-class CommentDeleteDeleteView(CommentAccessMixin, CommentMixinView, DeleteView):
+class CommentDeleteDeleteView(CommentAccesMixin, CommentMixinView, DeleteView):
     model = Comment
     template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'

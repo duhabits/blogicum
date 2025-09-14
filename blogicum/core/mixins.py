@@ -1,8 +1,7 @@
 from blog.models import Comment, Post
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
-from django.views.generic import CreateView
+from django.urls import reverse     
 from django.http import HttpResponseForbidden
 
 
@@ -15,7 +14,7 @@ class CommentMixinView:
         )
 
 
-class CommentAccessMixin(LoginRequiredMixin):
+class CommentAccesMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
         self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
         if request.user != self.comment.author:
