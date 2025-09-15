@@ -1,7 +1,6 @@
 from django.contrib import admin
-from django.urls import include, path, reverse_lazy
+from django.urls import include, path
 from django.conf import settings
-from django.views.generic.edit import CreateView
 from django.conf.urls.static import static
 
 from blog.views import AuthCreateView

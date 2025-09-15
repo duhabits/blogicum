@@ -3,8 +3,6 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
-from django.db.models import Count
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -19,7 +17,7 @@ from django.views.generic import (
 
 from .const import PAGINATE_BY
 from .forms import CommentForm, PostForm, UserEditForm
-from .models import Category, Comment, Post
+from .models import Category, Post
 from core.mixins import AuthorCheckMixin, CommentMixin, PostMixin
 from core.utils import (
     filter_published_posts,
