@@ -1,38 +1,27 @@
 from blog.models import Comment, Post
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.http import HttpResponseForbidden
 
 
-class CommentMixinView:
-    model = Comment
+class AuthorCheckMixin(UserPassesTestMixin):
+    template_name = 'blog/comment.html'
+    pk_url_kwarg = 'comment_id'
 
-    def get_success_url(self):
-        return reverse(
-            'blog:post_detail', kwargs={'post_id': self.kwargs['post_id']}
-        )
+    def test_func(self):
+        obj = self.get_object()
+        return self.request.user == obj.author
 
-
-class CommentAccesMixin(LoginRequiredMixin):
-    def dispatch(self, request, *args, **kwargs):
-        self.comment = get_object_or_404(Comment, id=kwargs['comment_id'])
-        if request.user != self.comment.author:
+    def handle_no_permission(self):
+        if self.raise_exception or self.request.user.is_authenticated:
             return HttpResponseForbidden(
-                "Вы не можете изменять чужой комментарий"
+                "У вас нет прав для выполнения этого действия"
             )
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_object(self, queryset=None):
-        return self.comment
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['comment'] = self.comment
-        return context
+        return redirect('login')
 
 
-class PostMixinView(LoginRequiredMixin):
+class PostMixin(AuthorCheckMixin, LoginRequiredMixin):
     model = Post
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
@@ -45,3 +34,13 @@ class PostMixinView(LoginRequiredMixin):
 
     def get_success_url(self):
         return reverse('blog:index')
+
+
+class CommentMixin(LoginRequiredMixin):
+    model = Comment
+    fields = ('text',)
+
+    def get_success_url(self):
+        return reverse(
+            'blog:post_detail', kwargs={'post_id': self.kwargs['post_id']}
+        )

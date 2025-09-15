@@ -79,7 +79,12 @@ class Post(IsPublishedAbsract, CreatedAt):
         on_delete=models.SET_NULL,
         verbose_name='Категория',
     )
-    image = models.ImageField('Фото', upload_to='post_images', blank=True)
+    image = models.ImageField(
+        upload_to="images",
+        blank=True,
+        null=True,
+        verbose_name="Изображение",
+    )
 
     class Meta:
         verbose_name = 'публикация'
@@ -101,11 +106,11 @@ class Comment(CreatedAt):
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='authored_comments',
+        related_name='comments',
         verbose_name='Автор',
     )
 
-    class Meta:
+    class Meta(CreatedAt.Meta):
         verbose_name = 'Коментарий'
         verbose_name_plural = 'Коментарии'
 

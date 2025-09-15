@@ -1,25 +1,31 @@
 from typing import Any
-from django.db.models.query import QuerySet
-from django.shortcuts import get_object_or_404
-from django.http import Http404
-from django.db.models import Count
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count
+from django.db.models.query import QuerySet
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from django.urls import reverse, reverse_lazy
 from django.views.generic import (
-    ListView,
     CreateView,
-    UpdateView,
     DeleteView,
     DetailView,
+    ListView,
+    UpdateView,
 )
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse
-from django.core.exceptions import PermissionDenied
 
-from .models import Post, Category, Comment
-from .forms import PostForm, CommentForm, UserEditForm
 from .const import PAGINATE_BY
-from core.utils import is_post_visible, filter_published_posts
-from core.mixins import CommentMixinView, CommentAccesMixin, PostMixinView
+from .forms import CommentForm, PostForm, UserEditForm
+from .models import Category, Comment, Post
+from core.mixins import AuthorCheckMixin, CommentMixin, PostMixin
+from core.utils import (
+    filter_published_posts,
+    is_post_visible,
+    annotate_with_comment_count,
+)
 
 User = get_user_model()
 
@@ -40,9 +46,7 @@ class PostDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.user.is_authenticated:
-            context["form"] = CommentForm()
-            context["flag"] = True
+        context["form"] = CommentForm()
         context["comments"] = self.object.comments.select_related("author")
         return context
 
@@ -50,13 +54,11 @@ class PostDetailView(DetailView):
 class IndexListView(ListView):
     model = Post
     template_name = 'blog/index.html'
-    paginate_by = 10
+    paginate_by = PAGINATE_BY
 
     def get_queryset(self):
-        return (
+        return annotate_with_comment_count(
             filter_published_posts(Post.objects.all())
-            .annotate(comment_count=Count('comments'))
-            .order_by('-pub_date')
         )
 
 
@@ -66,10 +68,9 @@ class CategoryListView(LoginRequiredMixin, ListView):
     paginate_by = PAGINATE_BY
 
     def get_category(self):
-        category = get_object_or_404(
+        return get_object_or_404(
             Category, is_published=True, slug=self.kwargs['category_slug']
         )
-        return category
 
     def get_queryset(self) -> QuerySet[Any]:
         self.category = self.get_category()
@@ -87,23 +88,22 @@ class UserProfileListView(ListView):
     context_object_name = 'page_obj'
     paginate_by = PAGINATE_BY
 
+    def get_author(self):
+        return get_object_or_404(User, username=self.kwargs['username'])
+
     def get_queryset(self) -> QuerySet[Any]:
-        self.profile_user = get_object_or_404(
-            User, username=self.kwargs['username']
-        )
-        queryset = self.profile_user.posts.select_related("category").annotate(
-            comment_count=Count("comments")
+        queryset = annotate_with_comment_count(
+            self.get_author().posts.select_related("category")
         )
 
-        # Для не-владельцев показываем только опубликованные посты
-        if self.request.user != self.profile_user:
+        if self.request.user != self.get_author():
             queryset = filter_published_posts(queryset)
 
-        return queryset.order_by('-pub_date')
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['profile'] = self.profile_user
+        context['profile'] = self.get_author()
         return context
 
 
@@ -121,40 +121,19 @@ class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
         )
 
 
-class CommentCreateView(CommentMixinView, CreateView):
-    fields = (('text'),)
-    template_name = 'blog/comment_form.html'
-
+class CommentCreateView(CommentMixin, CreateView):
     def form_valid(self, form):
-        if not self.request.user.is_authenticated:
-            raise PermissionDenied(
-                "Вы должны войти, чтобы оставить комментарий."
-            )
-        post = get_object_or_404(Post, pk=self.kwargs['post_id'])
         form.instance.author = self.request.user
-        form.instance.post = post
+        form.instance.post = get_object_or_404(Post, pk=self.kwargs['post_id'])
         return super().form_valid(form)
 
 
-class CommentEditUpdateView(CommentAccesMixin, CommentMixinView, UpdateView):
-    model = Comment
-    fields = ('text',)
-    template_name = 'blog/comment.html'
-    pk_url_kwarg = 'comment_id'
+class CommentEditUpdateView(CommentMixin, AuthorCheckMixin, UpdateView):
+    pass
 
 
-class CommentDeleteDeleteView(CommentAccesMixin, CommentMixinView, DeleteView):
-    model = Comment
-    template_name = 'blog/comment.html'
-    pk_url_kwarg = 'comment_id'
-
-    def get(self, request, *args, **kwargs):
-        """GET-запрос только показывает форму подтверждения, не удаляет"""
-        return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        """POST-запрос выполняет удаление"""
-        return super().post(request, *args, **kwargs)
+class CommentDeleteDeleteView(CommentMixin, AuthorCheckMixin, DeleteView):
+    pass
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -172,9 +151,15 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class PostEditUpdateView(PostMixinView, UpdateView):
+class PostEditUpdateView(PostMixin, UpdateView):
     form_class = PostForm
 
 
-class PostDeleteDeleteView(PostMixinView, DeleteView):
+class PostDeleteDeleteView(PostMixin, DeleteView):
     pass
+
+
+class AuthCreateView(CreateView):
+    template_name = ('registration/registration_form.html',)
+    form_class = (UserCreationForm,)
+    success_url = reverse_lazy('blog:index')
