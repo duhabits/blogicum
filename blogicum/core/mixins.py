@@ -6,19 +6,8 @@ from django.http import HttpResponseForbidden
 
 
 class AuthorCheckMixin(UserPassesTestMixin):
-    template_name = 'blog/comment.html'
-    pk_url_kwarg = 'comment_id'
-
     def test_func(self):
-        obj = self.get_object()
-        return self.request.user == obj.author
-
-    def handle_no_permission(self):
-        if self.raise_exception or self.request.user.is_authenticated:
-            return HttpResponseForbidden(
-                "У вас нет прав для выполнения этого действия"
-            )
-        return redirect('login')
+        return self.request.user == self.get_object().author
 
 
 class PostMixin(AuthorCheckMixin, LoginRequiredMixin):
@@ -26,19 +15,27 @@ class PostMixin(AuthorCheckMixin, LoginRequiredMixin):
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
 
-    def dispatch(self, request, *args, **kwargs):
-        self.post_obj = get_object_or_404(Post, id=kwargs['post_id'])
-        if request.user != self.post_obj.author:
-            return redirect('blog:post_detail', post_id=kwargs['post_id'])
-        return super().dispatch(request, *args, **kwargs)
-
     def get_success_url(self):
         return reverse('blog:index')
+
+    def handle_no_permission(self):
+        if self.raise_exception or self.request.user.is_authenticated:
+            return HttpResponseForbidden(
+                "У вас нет прав для выполнения этого действия"
+            )
+        return reverse(
+            'blog:post',
+            kwargs={
+                'username': get_object_or_404(Post, pk=self.kwargs['post_id'])
+            },
+        )
 
 
 class CommentMixin(LoginRequiredMixin):
     model = Comment
     fields = ('text',)
+    template_name = 'blog/comment.html'
+    pk_url_kwarg = 'comment_id'
 
     def get_success_url(self):
         return reverse(

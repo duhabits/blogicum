@@ -14,16 +14,13 @@ from django.views.generic import (
     ListView,
     UpdateView,
 )
+from django.utils import timezone
 
 from .const import PAGINATE_BY
 from .forms import CommentForm, PostForm, UserEditForm
 from .models import Category, Post
 from core.mixins import AuthorCheckMixin, CommentMixin, PostMixin
-from core.utils import (
-    filter_published_posts,
-    is_post_visible,
-    annotate_with_comment_count,
-)
+from core.utils import filter_published_posts, annotate_with_comment_count
 
 User = get_user_model()
 
@@ -35,11 +32,21 @@ class PostDetailView(DetailView):
 
     def get_object(self, queryset=None):
         post = get_object_or_404(Post, pk=self.kwargs["post_id"])
-        if (
-            not is_post_visible(post, self.request.user)
-            and self.request.user != post.author
-        ):
+        if self.request.user == post.author:
+            return post
+
+        now = timezone.now()
+        category_ok = post.category is None or (
+            post.category.is_published and bool(post.category.slug)
+        )
+
+        post_is_visible = (
+            post.is_published and post.pub_date <= now and category_ok
+        )
+
+        if not post_is_visible:
             raise Http404("Пост не доступен")
+
         return post
 
     def get_context_data(self, **kwargs):
@@ -71,8 +78,7 @@ class CategoryListView(LoginRequiredMixin, ListView):
         )
 
     def get_queryset(self) -> QuerySet[Any]:
-        self.category = self.get_category()
-        return filter_published_posts(self.category.posts)
+        return filter_published_posts(self.get_category().posts)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -90,9 +96,7 @@ class UserProfileListView(ListView):
         return get_object_or_404(User, username=self.kwargs['username'])
 
     def get_queryset(self) -> QuerySet[Any]:
-        queryset = annotate_with_comment_count(
-            self.get_author().posts.select_related("category")
-        )
+        queryset = annotate_with_comment_count(self.get_author().posts)
 
         if self.request.user != self.get_author():
             queryset = filter_published_posts(queryset)
