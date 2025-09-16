@@ -1,8 +1,8 @@
-from blog.models import Comment, Post
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.urls import reverse
-from django.http import HttpResponseForbidden
+
+from blog.models import Comment, Post
 
 
 class AuthorCheckMixin(UserPassesTestMixin):
@@ -19,16 +19,7 @@ class PostMixin(AuthorCheckMixin, LoginRequiredMixin):
         return reverse('blog:index')
 
     def handle_no_permission(self):
-        if self.raise_exception or self.request.user.is_authenticated:
-            return HttpResponseForbidden(
-                "У вас нет прав для выполнения этого действия"
-            )
-        return reverse(
-            'blog:post',
-            kwargs={
-                'username': get_object_or_404(Post, pk=self.kwargs['post_id'])
-            },
-        )
+        return redirect('blog:post_detail', post_id=self.kwargs['post_id'])
 
 
 class CommentMixin(LoginRequiredMixin):

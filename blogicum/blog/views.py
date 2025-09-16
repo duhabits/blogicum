@@ -20,7 +20,7 @@ from .const import PAGINATE_BY
 from .forms import CommentForm, PostForm, UserEditForm
 from .models import Category, Post
 from core.mixins import AuthorCheckMixin, CommentMixin, PostMixin
-from core.utils import filter_published_posts, annotate_with_comment_count
+from core.services import filter_published_posts, annotate_with_comment_count
 
 User = get_user_model()
 
