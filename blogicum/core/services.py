@@ -4,7 +4,8 @@ from django.db.models import Count
 
 def annotate_with_comment_count(queryset):
     return (
-        queryset.annotate(comment_count=Count('comments')).order_by('-pub_date')
+        queryset.annotate(comment_count=Count('comments'))
+        .order_by('-pub_date')
     ).select_related(
         'category',
         'location',
