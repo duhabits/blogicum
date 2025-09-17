@@ -46,8 +46,8 @@ urlpatterns = [
         name='delete_comment',
     ),
     path(
-        'posts/create/', 
-        views.PostCreateView.as_view(), 
+        'posts/create/',
+        views.PostCreateView.as_view(),
         name='create_post'
     ),
     path(
