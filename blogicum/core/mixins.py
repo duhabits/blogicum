@@ -3,6 +3,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 
 from blog.models import Comment, Post
+from blog.forms import PostForm
 
 
 class AuthorCheckMixin(UserPassesTestMixin):
@@ -15,8 +16,13 @@ class PostMixin(AuthorCheckMixin, LoginRequiredMixin):
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = PostForm(instance=self.object)
+        return context
+
     def get_success_url(self):
-        return reverse('blog:index')
+        return reverse('blog:profile', args=(self.request.user.username,))
 
     def handle_no_permission(self):
         return redirect('blog:post_detail', post_id=self.kwargs['post_id'])

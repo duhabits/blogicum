@@ -115,4 +115,4 @@ class Comment(CreatedAt):
         verbose_name_plural = 'Коментарии'
 
     def __str__(self) -> str:
-        return self.text[:20]
+        return self.text[:MAX_DISPLAY_LENGTH]

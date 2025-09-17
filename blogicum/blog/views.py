@@ -33,21 +33,10 @@ class PostDetailView(DetailView):
     def get_object(self, queryset=None):
         post = get_object_or_404(Post, pk=self.kwargs["post_id"])
         if self.request.user == post.author:
-            return post
-
-        now = timezone.now()
-        category_ok = post.category is None or (
-            post.category.is_published and bool(post.category.slug)
+            return get_object_or_404(Post, pk=self.kwargs["post_id"])
+        return get_object_or_404(
+            filter_published_posts(Post.objects), pk=self.kwargs["post_id"]
         )
-
-        post_is_visible = (
-            post.is_published and post.pub_date <= now and category_ok
-        )
-
-        if not post_is_visible:
-            raise Http404("Пост не доступен")
-
-        return post
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -78,7 +67,9 @@ class CategoryListView(LoginRequiredMixin, ListView):
         )
 
     def get_queryset(self) -> QuerySet[Any]:
-        return filter_published_posts(self.get_category().posts)
+        return annotate_with_comment_count(
+            filter_published_posts(self.get_category().posts)
+        )
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
