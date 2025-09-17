@@ -45,7 +45,11 @@ urlpatterns = [
         views.CommentDeleteDeleteView.as_view(),
         name='delete_comment',
     ),
-    path('posts/create/', views.PostCreateView.as_view(), name='create_post'),
+    path(
+        'posts/create/', 
+        views.PostCreateView.as_view(), 
+        name='create_post'
+    ),
     path(
         'posts/<int:post_id>/edit/',
         views.PostEditUpdateView.as_view(),
